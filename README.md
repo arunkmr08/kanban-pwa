@@ -1,4 +1,4 @@
-# ZöTok Kanban PWA
+# Kanban PWA
 
 A drag-and-drop Kanban board (Marketing/Sales/Conversations) with table view, customer details drawer, and Light/Dark/System theming. Built with **Vite + React + Tailwind** and works as a PWA (installable).
 
