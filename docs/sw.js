@@ -1,11 +1,8 @@
-const CACHE = 'zotok-kanban-cache-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest'
-];
+const CACHE = 'kanban-pwa-cache-v1';
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  const BASE = self.registration.scope; // e.g., https://user.github.io/kanban-pwa/
+  const assets = ['.', 'index.html', 'manifest.webmanifest'].map(p => new URL(p, BASE).toString());
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(assets)));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(

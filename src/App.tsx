@@ -4,6 +4,7 @@ import { DndContext, closestCenter, DragOverlay, PointerSensor, useSensor, useSe
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Search, MoreHorizontal, Pin, PinOff, ArrowRightLeft, X, Users, Eye, Pencil, Trash2, LayoutList, LayoutGrid, ChevronDown, ChevronUp, Sun, Moon, Monitor } from "lucide-react";
+import { apiEnabled, getFunnels as apiGetFunnels, createGroup as apiCreateGroup, renameGroupApi, deleteGroupApi, moveGroupToFunnelApi, reorderCardsApi, moveCardApi } from "./lib/api";
 
 // ---------------- THEME HANDLER ----------------
 type ThemeMode = "light" | "dark" | "system";
@@ -150,7 +151,23 @@ export default function App() {
     } catch {}
   }, [funnels, activeFunnelId]);
 
-  // Using local seed data (no backend)
+  // Try to load from backend (if configured); fallback to local storage/seed
+  useEffect(() => {
+    if (!apiEnabled) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiGetFunnels<Funnel[]>();
+        if (!cancelled && Array.isArray(data) && data.length) {
+          setFunnels(data);
+          setActiveFunnelId(data[0].id);
+        }
+      } catch {
+        // ignore network errors; remain on local
+      }
+    })();
+    return () => { cancelled = true };
+  }, []);
 
   function onDragStart(e: any) { setDraggingId(e.active.id); }
   function onDragEnd(e: any) {
@@ -195,6 +212,8 @@ export default function App() {
           groups: groups.map((g, i) => i === sIndex ? { ...g, cards: arrayMove(g.cards, oldIndex, newIndex) } : g)
         };
         setFunnels(next);
+        // persist same-group reorder
+        reorderCardsApi(groups[sIndex].id, next[fIndex].groups[sIndex].cards.map(c => c.id)).catch(() => {});
         return;
       }
 
@@ -211,6 +230,8 @@ export default function App() {
         groups: groups.map((g, i) => i === sIndex ? { ...g, cards: sourceCards } : i === dIndex ? { ...g, cards: destCards } : g)
       };
       setFunnels(next);
+      const destPos = next[fIndex].groups[dIndex].cards.findIndex(c => c.id === active.id);
+      moveCardApi(active.id, groups[dIndex].id, destPos).catch(() => {});
       return;
     }
 
@@ -235,6 +256,7 @@ export default function App() {
         groups: groups.map((g, i) => i === sIndex ? { ...g, cards: sourceCards } : i === dIndex ? { ...g, cards: destCards } : g)
       };
       setFunnels(next);
+      moveCardApi(active.id, groups[dIndex].id, next[fIndex].groups[dIndex].cards.length - 1).catch(() => {});
       return;
     }
   }
@@ -249,15 +271,18 @@ export default function App() {
     const tIndex = next.findIndex(f => f.id === targetFunnelId);
     next[tIndex] = { ...next[tIndex], groups: [...next[tIndex].groups, group] };
     setFunnels(next);
+    moveGroupToFunnelApi(groupId, targetFunnelId).catch(() => {});
   }
   function renameGroup(groupId: string) {
     const name = prompt("Rename group to:");
     if (!name) return;
     setFunnels(prev => prev.map(f => f.id !== activeFunnelId ? f : ({ ...f, groups: f.groups.map(g => g.id === groupId ? { ...g, name } : g) })));
+    renameGroupApi(groupId, name).catch(() => {});
   }
   function deleteGroup(groupId: string) {
     if (!confirm("Delete this group? This is a demo; cards will be lost.")) return;
     setFunnels(prev => prev.map(f => f.id !== activeFunnelId ? f : ({ ...f, groups: f.groups.filter(g => g.id !== groupId) })));
+    deleteGroupApi(groupId).catch(() => {});
   }
   function togglePin(cardId: string) {
     setFunnels(prev => prev.map(f => f.id !== activeFunnelId ? f : ({ ...f, groups: f.groups.map(g => ({ ...g, cards: g.cards.map(c => c.id === cardId ? { ...c, pinned: !c.pinned } : c) })) })));
@@ -273,8 +298,21 @@ export default function App() {
     if (!name) return;
     const palette = ["#5b9cf3","#f59f00","#22c55e","#94a3b8","#6366f1","#eab308","#0ea5e9","#10b981"];
     const color = palette[Math.floor(Math.random() * palette.length)];
-    const newGroup: Group = { id: makeId("g"), name, description: params.description?.trim(), mode: params.mode, color, cards: [], visibleCount: 3 };
+    const localId = makeId("g");
+    const newGroup: Group = { id: localId, name, description: params.description?.trim(), mode: params.mode, color, cards: [], visibleCount: 3 };
     setFunnels(prev => prev.map(f => f.id === activeFunnelId ? { ...f, groups: [...f.groups, newGroup] } : f));
+    if (apiEnabled) {
+      apiCreateGroup({ name, description: params.description, mode: params.mode, color, funnelId: activeFunnelId })
+        .then((created: any) => {
+          if (created?.id) {
+            setFunnels(prev => prev.map(f => f.id !== activeFunnelId ? f : ({
+              ...f,
+              groups: f.groups.map(g => g.id === localId ? { ...g, id: created.id } : g)
+            })));
+          }
+        })
+        .catch(() => {});
+    }
     setAddOpen(false);
   }
 
