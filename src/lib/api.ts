@@ -3,12 +3,14 @@ const BASE = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, "") ||
 export const apiEnabled = Boolean(BASE);
 const url = (p: string) => `${BASE}${p}`;
 
-function authHeaders() {
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = {};
   try {
     const ls = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const token = ls || (import.meta as any).env?.VITE_API_TOKEN;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  } catch { return {}; }
+    if (token) h['Authorization'] = `Bearer ${token}`;
+  } catch {}
+  return h;
 }
 
 async function json<T>(res: Response): Promise<T> {
@@ -18,7 +20,7 @@ async function json<T>(res: Response): Promise<T> {
 
 export async function getFunnels<T = any[]>(): Promise<T> {
   if (!apiEnabled) throw new Error('API disabled');
-  const res = await fetch(url('/funnels'), { headers: { ...authHeaders() } });
+  const res = await fetch(url('/funnels'), { headers: authHeaders() });
   return json<T>(res);
 }
 
@@ -26,7 +28,7 @@ export async function createGroup(input: { name: string; description?: string; m
   if (!apiEnabled) throw new Error('API disabled');
   const res = await fetch(url('/groups'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
   return json<any>(res);
@@ -36,21 +38,21 @@ export async function renameGroupApi(id: string, name: string): Promise<void> {
   if (!apiEnabled) throw new Error('API disabled');
   await fetch(url(`/groups/${id}`), {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
 }
 
 export async function deleteGroupApi(id: string): Promise<void> {
   if (!apiEnabled) throw new Error('API disabled');
-  await fetch(url(`/groups/${id}`), { method: 'DELETE', headers: { ...authHeaders() } });
+  await fetch(url(`/groups/${id}`), { method: 'DELETE', headers: authHeaders() });
 }
 
 export async function moveGroupToFunnelApi(id: string, funnelId: string): Promise<void> {
   if (!apiEnabled) throw new Error('API disabled');
   await fetch(url(`/groups/${id}`), {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ funnelId }),
   });
 }
@@ -59,7 +61,7 @@ export async function reorderCardsApi(groupId: string, cardIds: string[]): Promi
   if (!apiEnabled) throw new Error('API disabled');
   await fetch(url(`/groups/${groupId}`), {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ cardOrder: cardIds }),
   });
 }
@@ -68,8 +70,7 @@ export async function moveCardApi(cardId: string, groupId: string, position: num
   if (!apiEnabled) throw new Error('API disabled');
   await fetch(url(`/cards/${cardId}`), {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ groupId, position }),
   });
 }
-
