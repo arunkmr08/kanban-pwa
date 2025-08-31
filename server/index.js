@@ -1,10 +1,25 @@
 import express from 'express'
 import cors from 'cors'
 import { nanoid } from 'nanoid'
+import dotenv from 'dotenv'
+
+dotenv.config()
 
 const app = express()
-app.use(cors({ origin: '*'}))
+const ALLOW_ORIGIN = process.env.CORS_ORIGIN || '*'
+const API_TOKEN = process.env.API_TOKEN || ''
+app.use(cors({ origin: ALLOW_ORIGIN }))
 app.use(express.json())
+
+// Simple bearer auth middleware when API_TOKEN is set
+if (API_TOKEN) {
+  app.use((req, res, next) => {
+    const auth = req.headers['authorization'] || ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+    if (token !== API_TOKEN) return res.status(401).json({ error: 'Unauthorized' })
+    next()
+  })
+}
 
 // In-memory data — swap with a real DB later
 const makeId = (p) => `${p}_${nanoid(8)}`
@@ -117,4 +132,3 @@ app.patch('/cards/:id', (req, res) => {
 
 const PORT = process.env.PORT || 8080
 app.listen(PORT, () => console.log(`API listening on ${PORT}`))
-
