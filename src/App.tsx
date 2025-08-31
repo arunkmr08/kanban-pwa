@@ -98,8 +98,24 @@ const initialFunnels: Funnel[] = [
 // ---------- Main Component ----------
 export default function App() {
   const { theme, setTheme } = useTheme();
-  const [funnels, setFunnels] = useState<Funnel[]>(initialFunnels);
-  const [activeFunnelId, setActiveFunnelId] = useState<string>(initialFunnels[0].id);
+  // Persisted state (localStorage)
+  type PersistedState = { funnels: Funnel[]; activeFunnelId: string };
+  const STATE_KEY = 'kanban_pwa_state_v1';
+  const loadState = (): PersistedState | null => {
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.funnels) && typeof parsed.activeFunnelId === 'string') return parsed;
+      return null;
+    } catch {
+      return null;
+    }
+  };
+  const persisted = typeof window !== 'undefined' ? loadState() : null;
+
+  const [funnels, setFunnels] = useState<Funnel[]>(persisted?.funnels || initialFunnels);
+  const [activeFunnelId, setActiveFunnelId] = useState<string>(persisted?.activeFunnelId || initialFunnels[0].id);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | null>(null);
@@ -125,6 +141,14 @@ export default function App() {
         .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))),
     }));
   }, [activeFunnel, query, statusFilter]);
+
+  // Save to localStorage whenever funnels or active funnel changes
+  useEffect(() => {
+    try {
+      const state: PersistedState = { funnels, activeFunnelId };
+      localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    } catch {}
+  }, [funnels, activeFunnelId]);
 
   // Using local seed data (no backend)
 
