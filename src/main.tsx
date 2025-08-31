@@ -6,7 +6,8 @@ import './index.css'
 // Register service worker if supported
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+    // Build an absolute URL so it works on GitHub Pages project paths
+    const swUrl = new URL('sw.js', window.location.origin + import.meta.env.BASE_URL).toString()
     navigator.serviceWorker.register(swUrl).catch(() => {})
   })
 }
